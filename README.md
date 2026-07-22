@@ -41,6 +41,11 @@ UVS_AUTH_TOKEN=changeme
 # Defaults to empty value which means verification is made against
 # whatever Matrix server name passed in with the token.
 UVS_OPENID_VERIFY_SERVER_NAME=matrix.org
+# Serve several homeservers at once. JSON object keyed by Matrix server name,
+# each with the admin API URL and an admin token for that homeserver. Replaces
+# UVS_HOMESERVER_URL, UVS_ACCESS_TOKEN and UVS_OPENID_VERIFY_SERVER_NAME when
+# set. See below section.
+UVS_HOMESERVERS={"example.org":{"url":"http://synapse:8008","token":"syt_..."}}
 # Listen address of the bot
 UVS_LISTEN_ADDRESS=127.0.0.1
 # Listen port of the bot
@@ -68,8 +73,34 @@ isn't otherwise federating. If the homeserver config doesn't have the `federatio
 listener setup, the `openid` listener can be added on the same port as the `client`
 listener.
 
-Room membership is still currently limited to be verified from a single
-configured homeserver client API via `UVS_HOMESERVER_URL`.
+#### Multiple homeservers
+
+Room membership and power levels can only be answered by the homeserver that
+owns the room, using its Synapse admin API — so serving users of more than one
+homeserver needs one admin credential per homeserver. `UVS_HOMESERVERS` holds
+them, keyed by Matrix server name, which is the value clients pass as
+`matrix_server_name`:
+
+```json
+{
+  "example.org": {"url": "http://synapse:8008", "token": "syt_..."},
+  "example.com": {"url": "https://matrix.example.com", "token": "syt_..."}
+}
+```
+
+When set, it replaces `UVS_HOMESERVER_URL`, `UVS_ACCESS_TOKEN` and
+`UVS_OPENID_VERIFY_SERVER_NAME`: OpenID tokens are accepted for exactly the
+server names listed, each room lookup goes to the matching homeserver with its
+own token, and `matrix_server_name` becomes a required request field. An
+unknown server name is refused rather than falling back to a default
+homeserver, and a malformed `UVS_HOMESERVERS` refuses everything instead of
+quietly reverting to single homeserver mode.
+
+While unset, behaviour is unchanged: one homeserver via `UVS_HOMESERVER_URL`.
+
+Note that federation is not required between the homeservers, but each one
+must still expose the federation `openid` endpoint for token verification, as
+described above.
 
 ### API's available
 

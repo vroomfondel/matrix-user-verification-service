@@ -4,6 +4,7 @@ const {
     verifyOpenIDToken,
     verifyRoomMembership,
 } = require('./verify');
+const homeservers = require('./homeservers');
 const logger = require('./logger');
 const {
     authenticateRequest,
@@ -23,7 +24,7 @@ const routes = {
         }
         const fields = ['token'];
         // TODO This check can be removed in 3.0, making `matrix_server_name` just required always.
-        if (!process.env.UVS_OPENID_VERIFY_SERVER_NAME) {
+        if (homeservers.requiresServerName()) {
             fields.push('matrix_server_name');
         }
         const checkResult = sanityCheckRequest(req, res, fields);
@@ -54,7 +55,7 @@ const routes = {
         }
         const fields = ['token', 'room_id'];
         // TODO This check can be removed in 3.0, making `matrix_server_name` just required always.
-        if (!process.env.UVS_OPENID_VERIFY_SERVER_NAME) {
+        if (homeservers.requiresServerName()) {
             fields.push('matrix_server_name');
         }
         const checkResult = sanityCheckRequest(req, res, fields);

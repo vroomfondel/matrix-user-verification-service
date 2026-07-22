@@ -1,3 +1,4 @@
+const homeservers = require('./homeservers');
 const logger = require('./logger');
 const matrixUtils = require('./matrixUtils');
 const utils = require('./utils');
@@ -16,15 +17,21 @@ const utils = require('./utils');
  */
 async function getRoomPowerLevels(userId, req) {
     let response;
-    const homeserverUrl = process.env.UVS_HOMESERVER_URL;
+    const homeserver = homeservers.resolveAdminHomeserver(req.body.matrix_server_name);
+    if (!homeserver) {
+        logger.log('warn',
+            `No homeserver admin API configured for ${req.body.matrix_server_name}`,
+            {requestId: req.requestId});
+        return;
+    }
     try {
-        const url = `${homeserverUrl}/_synapse/admin/v1/rooms/${req.body.room_id}/state`;
+        const url = `${homeserver.url}/_synapse/admin/v1/rooms/${req.body.room_id}/state`;
         logger.log('debug', `Making request to: ${url}`, {requestId: req.requestId});
         response = await utils.axiosGet(
             url,
             null,
             {
-                Authorization: `Bearer ${process.env.UVS_ACCESS_TOKEN}`,
+                Authorization: `Bearer ${homeserver.token}`,
             }
         );
     } catch (error) {
@@ -80,20 +87,16 @@ function sanityCheckRequest(req, res, fields=[]) {
 async function verifyOpenIDToken(req) {
     let homeserver;
     let response;
-    let serverName;
-    if (process.env.UVS_OPENID_VERIFY_SERVER_NAME) {
-        if (req.body.matrix_server_name !== process.env.UVS_OPENID_VERIFY_SERVER_NAME) {
-            // Refuse to check token against any other servers
-            logger.log(
-                'warn',
-                'Refusing to check token which is not for the server we have configured: ' +
-                    req.body.matrix_server_name,
-            );
-            return false;
-        }
-        serverName = process.env.UVS_OPENID_VERIFY_SERVER_NAME;
-    } else {
-        serverName = req.body.matrix_server_name;
+    const serverName = req.body.matrix_server_name;
+    const allowedServerNames = homeservers.getAllowedServerNames();
+    if (allowedServerNames && !allowedServerNames.includes(serverName)) {
+        // Refuse to check token against any other servers
+        logger.log(
+            'warn',
+            'Refusing to check token which is not for a server we have configured: ' +
+                serverName,
+        );
+        return false;
     }
     try {
         homeserver = await matrixUtils.discoverHomeserverUrl(serverName);
@@ -143,15 +146,21 @@ async function verifyOpenIDToken(req) {
 
 async function verifyRoomMembership(userId, req) {
     let response;
-    const homeserverUrl = process.env.UVS_HOMESERVER_URL;
+    const homeserver = homeservers.resolveAdminHomeserver(req.body.matrix_server_name);
+    if (!homeserver) {
+        logger.log('warn',
+            `No homeserver admin API configured for ${req.body.matrix_server_name}`,
+            {requestId: req.requestId});
+        return false;
+    }
     try {
-        const url = `${homeserverUrl}/_synapse/admin/v1/rooms/${req.body.room_id}/members`;
+        const url = `${homeserver.url}/_synapse/admin/v1/rooms/${req.body.room_id}/members`;
         logger.log('debug', `Making request to: ${url}`, {requestId: req.requestId});
         response = await utils.axiosGet(
             url,
             null,
             {
-                Authorization: `Bearer ${process.env.UVS_ACCESS_TOKEN}`,
+                Authorization: `Bearer ${homeserver.token}`,
             }
         );
     } catch (error) {
