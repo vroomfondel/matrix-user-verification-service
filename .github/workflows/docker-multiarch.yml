@@ -9,9 +9,11 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: "Tag, branch or commit to build"
-        required: true
-        default: c5a66272d69f29644926655b772dff7af59f8a16
+        # No default here on purpose: it would shadow DEFAULT_REF below and
+        # silently build something else, since inputs.ref wins the fallback.
+        # DEFAULT_REF is the single source of truth.
+        description: "Tag, branch or commit to build (default: DEFAULT_REF)"
+        required: false
       tag_latest:
         description: "Also push :latest"
         type: boolean
