@@ -22,13 +22,17 @@ on:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/matrix-user-verification-service
-  # NOT the v3.0.0 tag: that is the July 2023 tree and builds FROM node:18-slim,
-  # which went EOL in April 2025 and no longer gets base image updates -- which
-  # would make the weekly rebuild below pointless. Upstream never cut a release
-  # after that, so the newest sane code is plain master: 7 commits ("Modernize
-  # for 2025", merged 2025-10-06) that move it to node:22-slim and current deps.
-  # Pinned by commit rather than by branch name so a build stays reproducible.
-  DEFAULT_REF: c5a66272d69f29644926655b772dff7af59f8a16
+  # Our own master: the UVS_HOMESERVERS patch on top of upstream c5a66272.
+  #
+  # Deliberately NOT the v3.0.0 tag: newest release though it is (2023-07), it
+  # builds FROM node:18-slim, EOL since April 2025 and no longer receiving base
+  # image updates -- which would make the weekly rebuild below pointless.
+  # Upstream cut no release after that ("Modernize for 2025" merged 2025-10-06
+  # is the newest code), so master is the only sane base.
+  #
+  # Pinned by commit rather than by branch name so a build stays reproducible;
+  # bump this when the fork gains commits that should ship.
+  DEFAULT_REF: 8b67d4878d6f13fc0b781ad0f31dc4e00e5a7adc
 
 jobs:
   build:
