@@ -24,17 +24,17 @@ on:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/matrix-user-verification-service
-  # Our own master: the UVS_HOMESERVERS patch on top of upstream c5a66272.
+  # This fork's master: the UVS_HOMESERVERS patch on top of upstream c5a66272.
+  # A branch, not a commit -- what ships is whatever we merged here, and
+  # pinning our own HEAD would only mean bumping this line on every patch.
+  # The exact commit built is still recorded, as the image's git-<sha> tag.
   #
   # Deliberately NOT the v3.0.0 tag: newest release though it is (2023-07), it
   # builds FROM node:18-slim, EOL since April 2025 and no longer receiving base
   # image updates -- which would make the weekly rebuild below pointless.
   # Upstream cut no release after that ("Modernize for 2025" merged 2025-10-06
-  # is the newest code), so master is the only sane base.
-  #
-  # Pinned by commit rather than by branch name so a build stays reproducible;
-  # bump this when the fork gains commits that should ship.
-  DEFAULT_REF: 8b67d4878d6f13fc0b781ad0f31dc4e00e5a7adc
+  # is its newest code).
+  DEFAULT_REF: master
 
 jobs:
   build:
@@ -43,28 +43,28 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Resolve build ref and tags
+      - name: Resolve build ref
+        id: ref
+        run: echo "value=${{ inputs.ref || env.DEFAULT_REF }}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ref.outputs.value }}
+
+      # After checkout, so the tag names the commit actually built even when
+      # the ref was a branch. Whatever ref was asked for, every build stays
+      # addressable by its commit.
+      - name: Derive image tags
         id: cfg
         run: |
-          REF="${{ inputs.ref || env.DEFAULT_REF }}"
-          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
-          # A full 40-char SHA makes for a useless image tag, so shorten it;
-          # branch/tag refs are used verbatim.
-          case "$REF" in
-            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
-              [ ${#REF} -eq 40 ] && VERSION_TAG="git-${REF:0:12}" || VERSION_TAG="$REF" ;;
-            *) VERSION_TAG="$REF" ;;
-          esac
-          TAGS="${IMAGE}:${VERSION_TAG}"
+          SHA="$(git rev-parse --short=12 HEAD)"
+          TAGS="${IMAGE}:git-${SHA}"
           # inputs.tag_latest is empty on schedule runs -> default to tagging latest
           if [ "${{ inputs.tag_latest }}" != "false" ]; then
             TAGS="${TAGS},${IMAGE}:latest"
           fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ steps.cfg.outputs.ref }}
+          echo "Building $(git rev-parse HEAD) from ref ${{ steps.ref.outputs.value }}" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
